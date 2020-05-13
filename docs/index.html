@@ -1,0 +1,188 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+    <style>
+        body {
+            padding: 50px;
+            width: 1000px;
+            margin: auto;
+            font-weight: 300;
+            font-family: 'Open Sans', sans-serif;
+            color: #121212;
+        }
+        table, tbody, tr, td {
+            margin: 0;
+            padding-right: 15px;
+            border: 0;
+            border-spacing: 0;
+            vertical-align: top;
+        }
+        td {
+            width: 325px;
+        }
+        figcaption {
+            text-align: justify;
+        }
+        b {
+            color: mediumslateblue;
+        }
+        li {
+            text-align: left;
+            padding: 5px;
+        }
+    </style>
+    <title>CS 184 Final Project</title>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <link href="https://fonts.googleapis.com/css?family=Open+Sans|Source+Sans+Pro" rel="stylesheet">
+</head>
+
+<body>
+<h1 align="middle">3D Mesh Reconstruction from Point Clouds</h1>
+
+<div align="middle">
+    <img src="bunny.png" align="middle" width="400px"/>
+</div>
+
+<div>
+    <h2 align="middle">Abstract</h2>
+    <p>Our project’s goal is to construct a 3D mesh from a point cloud as input. A point cloud in our representation is
+        a collection of points in ℝ<sup>3</sup>. Renderings of 3D objects are commonly achieved using a mesh structure made up of
+        smaller shapes and faces, which is what makes this a challenging problem since we are trying to find an accurate
+        way to infer the triangle faces from a collection of unconnected vertices. This sort of a system is useful in
+        many AR/VR applications, medical imaging, and modeling of other real world objects where the object is sampled
+        only by points as a point cloud.
+    </p>
+    <p>We chose the Ball Pivoting Algorithm (as discussed in “The Ball-Pivoting Algorithm for Surface Reconstruction,”
+        Bernardini et. al.) to recreate triangles from vertices. Instead of using one of the previous class projects as
+        a starting point, we decided to write our implementation from scratch in Python3 in order to use its convenient
+        data structures and low syntactic overhead. This meant we had to clearly define our design of the world we worked
+        in (Vertex, Edge, Triangle, etc. representations) and map out the entire process of reading input, performing
+        the algorithm, and outputting in a readable or renderable format.
+    </p>
+</div>
+<br>
+<div align="middle">
+    <iframe width="420" height="315" src="https://youtube.com/embed/UeN7PFCad48"></iframe>
+</div>
+
+<div>
+    <h2 align="middle">Technical Approach</h2>
+    <p>We took a work fast, fail fast approach to implementing BPA by choosing Python as our coding language. This allowed
+        us to verify correct understanding quickly; however, it restricted us from rendering very large ply files. We made
+        a design doc prior to coding so that we flushed out the necessary data structures and how they would interact
+        during the execution of the algorithm.
+    </p>
+    <p>We used CodeShare to code together in real time and Zoom to communicate. We began by implementing a base skeleton
+        of our data structures and added to them once new needs became obvious as we implemented the algorithm. We took
+        a step-by-step approach, breaking down the algorithm into smaller sub-problems such as finding an initial ball
+        radius, initial seed triangle, and how to traverse the mesh.</p>
+    <p>Methods implemented:
+    <ul><li>Input Processing:</li>
+            <ul><li>Input files are in .ply format (see “How .ply files are constructed” in references)</li>
+                <li>We read each vertex from the input file into our Vertex class along with its normal that is
+                    computed using an external library</li>
+                <li>Construct a 3D grid of voxels (a voxel is a rrr cube where r is the radius of the ball) that spans
+                    the bounding cube of the point cloud.</li>
+                    <ul><li>r is determined by the average nearest neighbor distance of all points in the point cloud multiplied by some constant (we tried 4/3, 1 and ¾)</li></ul>
+                <li>Map each vertex to a voxel using the following formula for quick look up of vertices and their neighbors</li>
+                    <ul><li>vertex  VoxelArray[x][y][z]</li>
+                        <li>x=int((vertex[0]-MIN X COORD) / r)</li>
+                        <li>y=int((vertex[1]-MIN Y COORD) / r)</li>
+                        <li>z=int((vertex[2]-MIN Z COORD) / r)</li></ul>
+                <li>Note that each voxel may contain a list of 0 or more vertices</li></ul>
+        <li>Finding a seed triangle:</li>
+            <ul><li>Start with a single point</li>
+                <li>Find all neighboring points within 2 * ball radius</li>
+                <li>For every combination of neighbor pairs, compute if ball can validly sit on the triangle made and touches no other points</li>
+                    <ul><li>We compute if a ball can validly sit on three points, if the circumcenter of the triangle is closer to the points than our heuristic determined ball radius.  We then find the center of the ball by traveling along the circumcenter point normal</li>
+                        <li><img src="circumcenter.png" align="middle" width="500px"/></li>
+                        <li>Where a, b, c are the 3D points that make up a triangle and m is the circumcenter</li></ul>
+                <li>Returns the first found set of three points making the triangle</li></ul>
+        <li>Making the mesh using the Ball-Pivoting Algorithm:</li>
+            <ul><li>Initially, the front contains the seed triangle's edges</li>
+                <li>If you can pivot from one of the edges and</li>
+                    <ul><li>If the point you can pivot on is not used</li>
+                        <ul><li>Create a triangle and add 2 new edges to the front (join)</li></ul>
+                        <li>If the point you pivot on is used and</li>
+                            <ul><li>If the point is contained in one of the front's active edges</li>
+                                <ul><li>Then glue coincident edges together</li></ul>
+                                <li>If the point is not contained in one of the front's active edges</li>
+                                    <ul><li>Then mark the edge that you're pivoting on as a boundary edge</li></ul></ul></ul>
+                <li>Repeat the steps above until all possible edges have been exhausted</li>
+                <li>Return a list of triangles</li></ul></ul></p>
+    <img src="bpa.png" align="middle" width="600px"/>
+</div>
+
+<div>
+    <h2 align="middle">Results</h2>
+    <div align="middle">
+        <table style="width=100%">
+            <tr>
+                <td>
+                    <img src="bunny75.png" align="middle" width="325px"/>
+                    <figcaption align="middle"><i>r = 0.75 * avg closest neighbor distance.</i></figcaption>
+                </td>
+                <td>
+                    <img src="bunny.png" align="middle" width="330px"/>
+                    <figcaption align="middle"><i>r = avg closest neighbor distance.</i></figcaption>
+                </td>
+                <td>
+                    <img src="bunny133.png" align="middle" width="332px"/>
+                    <figcaption align="middle"><i>r = 1.33 * avg closest neighbor distance.</i></figcaption>
+                </td>
+            </tr>
+        </table>
+    </div>
+    <p>We tested our implementation using balls with different radii on the bunny file. We noticed:</p>
+    <ul><li>Some locations are clearly missing mesh connections, probably due to concavities or using a constant ball radius throughout the mesh</li>
+        <li>When the ball radius increases, the mesh becomes increasingly dense</li>
+        <li>Since we used the average closest neighbor distance as a heuristic for the ball radius, we noticed that this metric had a high variance. This might be another reason the meshes are not fully connected because the ball would have a hard time reaching locations that are much farther than this average measure.</li></ul>
+</div>
+
+<div>
+    <h2 align="middle">What We Learned</h2>
+    <ul><li>Python has pros and cons. It was easy to work with Python's familiar data structures and built-in functions, but it resulted in higher latency</li>
+        <li>How to think geometrically</li>
+        <li>How to determine if two vectors point to the same side of a plane</li>
+        <li>How a voxel array can be used for 3D position lookup</li>
+    </ul>
+</div>
+
+<div>
+    <h2 align="middle">Next Steps</h2>
+    <ul><li>Implement a changing radius by computing the average nearest neighbor distance for the points not yet considered</li>
+        <li>Resolve multiple .ply files so that we can input the entire object</li>
+        <li>Extend the data input process to generate point clouds from user created videos</li>
+        <li>Create a real-time application to generate a 3D model from a video</li></ul>
+</div>
+
+<div>
+    <h2 align="middle">References</h2>
+    <ul><li><a href="https://lidarwidgets.com/samples/bpa_tvcg.pdf">The theory and implementation of the Ball-Pivoting Algorithm</a></li>
+        <li><a href="http://graphics.stanford.edu/data/3Dscanrep/">Sample input .ply files</a></li>
+        <li><a href="http://www.meshlab.net/">A program that renders meshes</a></li>
+        <li><a href="https://people.sc.fsu.edu/~jburkardt/data/ply/ply.html">How .ply files are constructed</a></li>
+        <li><a href="http://www.open3d.org/docs/release/tutorial/Basic/file_io.html#point-cloud">A library that includes .ply file readers</a></li>
+        <li><a href="https://pointcloudlibrary.github.io/">A library that has a method to compute point normals</a></li></ul>
+</div>
+
+<div>
+    <h2 align="middle">Contributions</h2>
+    <div align="middle">
+        <table style="width=100%">
+            <tr>
+                <td>
+                    <img src="zoom1.png" align="middle" width="400px"/>
+                </td>
+                <td>
+                    <img src="zoom2.png" align="middle" width="400px"/>
+                </td>
+            </tr>
+        </table>
+    </div>
+    <ul><li>Pransu: research, submission, we all worked on CodeShare</li>
+        <li>Ryan: research, rendering, we all worked on CodeShare</li>
+        <li>Ivy: research, slides, webpage, we all worked on CodeShare</li></ul>
+</div>
+
+</body>
